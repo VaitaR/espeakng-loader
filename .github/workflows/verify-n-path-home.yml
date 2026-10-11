@@ -1,0 +1,65 @@
+# Verification-only (fork branch, not part of the PR): build.sh on current runners, then
+# initialize espeak-ng from a data path longer than the stock N_PATH_HOME.
+name: Verify N_PATH_HOME
+
+on:
+  push:
+    branches: [verify/n-path-home]
+
+jobs:
+  build:
+    name: ${{ matrix.archive }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: macos-14, archive: espeak-ng-libs-macos-arm64.tar.gz, extra-cmake-args: "", lib: lib/libespeak-ng.dylib, test: true, len: 200 }
+          - { platform: macos-15-intel, archive: espeak-ng-libs-macos-x86_64.tar.gz, extra-cmake-args: "", lib: lib/libespeak-ng.dylib, test: true, len: 200 }
+          - { platform: ubuntu-22.04, archive: espeak-ng-libs-linux-x86_64.tar.gz, extra-cmake-args: "", lib: lib/libespeak-ng.so, test: true, len: 200 }
+          - { platform: ubuntu-22.04, archive: espeak-ng-libs-linux-arm64.tar.gz, extra-cmake-args: "", lib: "", test: false, len: 0 }
+          - { platform: windows-latest, archive: espeak-ng-libs-windows-x86_64.tar.gz, extra-cmake-args: "", lib: lib/espeak-ng.dll, test: true, len: 232 }
+          - { platform: windows-latest, archive: espeak-ng-libs-windows-arm64.tar.gz, extra-cmake-args: "-A ARM64", lib: "", test: false, len: 0 }
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux arm64 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-aarch64-linux-gnu
+          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+        if: matrix.archive == 'espeak-ng-libs-linux-arm64.tar.gz'
+
+      - name: Build
+        run: |
+          git clone --single-branch --depth 1 -b 1.52.0 https://github.com/espeak-ng/espeak-ng
+          ./build.sh
+          mv espeak-ng/espeak-ng-libs.tar.gz ${{ matrix.archive }}
+        shell: bash
+        env:
+          EXTRA_CMAKE_ARGS: ${{ matrix.extra-cmake-args }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+        if: matrix.test
+
+      - name: Long data path — new build must pass, 0.2.4 wheel must fail
+        if: matrix.test
+        shell: bash
+        run: |
+          set -u
+          pip install espeakng-loader==0.2.4
+          new="$PWD/espeak-ng/espeak-ng-libs/${{ matrix.lib }}"
+          old=$(python -c "import espeakng_loader as e; print(e.get_library_path())")
+          python ci_path_test.py "$new" ${{ matrix.len }}
+          if python ci_path_test.py "$old" ${{ matrix.len }}; then
+            echo "negative control passed unexpectedly: the test does not exercise N_PATH_HOME"; exit 1
+          fi
+          echo "negative control failed as expected"
