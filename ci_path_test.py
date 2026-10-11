@@ -15,7 +15,9 @@ import espeakng_loader
 
 lib_path, n = sys.argv[1], int(sys.argv[2])
 base = tempfile.mkdtemp(prefix="esd")
-target = os.path.join(base, "x" * (n - len(base) - 1))
+target = base
+while len(target) < n:  # components of <= 100 chars stay under NAME_MAX
+    target = os.path.join(target, "x" * min(100, n - len(target) - 1))
 assert len(target) == n, len(target)
 shutil.copytree(espeakng_loader.get_data_path(), target)
 lib = ctypes.cdll.LoadLibrary(lib_path)
