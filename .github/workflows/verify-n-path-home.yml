@@ -36,6 +36,7 @@ jobs:
           git clone --single-branch --depth 1 -b 1.52.0 https://github.com/espeak-ng/espeak-ng
           ./build.sh
           mv espeak-ng/espeak-ng-libs.tar.gz ${{ matrix.archive }}
+          grep -E '^CMAKE_C_FLAGS(_RELEASE)?:' espeak-ng/build/CMakeCache.txt
         shell: bash
         env:
           EXTRA_CMAKE_ARGS: ${{ matrix.extra-cmake-args }}
@@ -58,6 +59,13 @@ jobs:
           pip install espeakng-loader==0.2.4
           new="$PWD/espeak-ng/espeak-ng-libs/${{ matrix.lib }}"
           old=$(python -c "import espeakng_loader as e; print(e.get_library_path())")
+          for n in 120 150 159 160 200 229 232 250; do
+            for which in new old; do
+              lib=${!which}
+              if python ci_path_test.py "$lib" $n >/dev/null 2>&1; then r=ok; else r=FAIL; fi
+              echo "scan $which len=$n $r"
+            done
+          done
           python ci_path_test.py "$new" ${{ matrix.len }}
           if python ci_path_test.py "$old" ${{ matrix.len }}; then
             echo "negative control passed unexpectedly: the test does not exercise N_PATH_HOME"; exit 1
