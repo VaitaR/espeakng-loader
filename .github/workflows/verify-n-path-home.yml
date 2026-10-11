@@ -60,6 +60,8 @@ jobs:
           new="$PWD/espeak-ng/espeak-ng-libs/${{ matrix.lib }}"
           old=$(python -c "import espeakng_loader as e; print(e.get_library_path())")
           if [[ "$RUNNER_OS" == Windows ]]; then
+            grep -rho '<PreprocessorDefinitions>[^<]*' espeak-ng/build/src/libespeak-ng/*.vcxproj | sort -u | head -5
+            mkdir -p "$PWD/t" && export TMP="$PWD/t" TEMP="$PWD/t"
             python ci_win_stat.py 229 230 231 232 240 247 248 249 259
             for n in 230 231 233 236 240; do
               for which in new old; do
