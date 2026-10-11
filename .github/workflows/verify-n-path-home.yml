@@ -59,6 +59,15 @@ jobs:
           pip install espeakng-loader==0.2.4
           new="$PWD/espeak-ng/espeak-ng-libs/${{ matrix.lib }}"
           old=$(python -c "import espeakng_loader as e; print(e.get_library_path())")
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            python ci_win_stat.py 229 230 231 232 240 247 248 249 259
+            for n in 230 231 233 236 240; do
+              for which in new old; do
+                lib=${!which}
+                echo "fine $which len=$n: $(python ci_path_test.py "$lib" $n 2>&1 | tail -1)"
+              done
+            done
+          fi
           for n in 120 150 159 160 200 229 232 250; do
             for which in new old; do
               lib=${!which}
